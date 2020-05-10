@@ -1,6 +1,6 @@
 enablePlugins(ScalaJSBundlerPlugin)
 
-name := "slinky-app"
+name := "elmizo"
 
 scalaVersion := "2.13.2"
 

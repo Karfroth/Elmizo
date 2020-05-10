@@ -29,9 +29,7 @@ object Main {
       dom.document.body.appendChild(elem)
       elem
     }
-
-    val component = App()
     
-    ReactDOM.render(component(), container)
+    ReactDOM.render(App(), container)
   }
 }
