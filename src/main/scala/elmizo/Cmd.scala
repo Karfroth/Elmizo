@@ -1,26 +1,45 @@
 package elmizo
 
 import scala.concurrent.Future
-
-sealed trait Cmd[Message]
+import scala.util.{Try, Success, Failure}
+import scala.concurrent.ExecutionContext
 
 object Cmd {
-    case object none extends Cmd[Nothing]
 
-    final case class ofMsg[Message](msg: Message) extends Cmd[Message]
+    /// Execute the commands using the supplied dispatcher
+    private[elmizo] def exec[Message](dispatch:Dispatch[Message])(cmd:Cmd[Message]) =
+        cmd.foreach(sub => sub(dispatch))
 
-    private[Cmd] final class ofFunc[A, Message](func: A => Message) extends Cmd[Message]
-    object ofFunc {
-        def apply[A, Message](func: A => Message) = new ofFunc(func)
+    def none[Message](): Cmd[Message] = List.empty
+    def map[A, Message](f: A => Message)(cmd: Cmd[A]): Cmd[Message] = {
+        val h = (dispatch: Dispatch[Message]) => dispatch compose f
+        cmd.map(g => g compose h)
+    }
+    def batch[Message](cmds: List[Cmd[Message]]): Cmd[Message] = cmds.flatten
+    def ofSub[Message](sub: Sub[Message]): Cmd[Message] = List(sub)
+
+    object OfFunc {
+        def either[A, B, Message](f: A => B)(args: A)(onSuccess: B => Message)(onFailure: Throwable => Message): Cmd[Message] = {
+            val sub = (dispatch: Dispatch[Message]) =>
+                Try(f(args)) match {
+                    case Success(v) => dispatch(onSuccess(v))
+                    case Failure(e) => dispatch(onFailure(e))
+                }
+            List(sub)
+        }
+        // TODO: Implement More
     }
 
-    private[Cmd] final class ofFuture[Message](msg: Future[Message]) extends Cmd[Message]
-    object ofFuture {
-        def apply[Message](func: Future[Message]) = new ofFuture(func)
-    }
-
-    private[Cmd] final class map[A, Message](func: A => Message)(cmd: Cmd[A])
-    object map {
-        def apply[A, Message](func: A => Message)(cmd: Cmd[A]): Cmd.map[A, Message] = new map(func)(cmd)
+    // TODO: Cats? ZIO? MONIX?
+    object OfFuture {
+        def either[A, B, Message](f: A => Future[B])(args: A)(onSuccess: B => Message)(onFailure: Throwable => Message)(implicit ec: ExecutionContext): Cmd[Message] = {
+            val sub = (dispatch: Dispatch[Message]) =>
+                f(args).onComplete{
+                case Success(v) => dispatch(onSuccess(v))
+                case Failure(e) => dispatch(onFailure(e))
+            }
+            List(sub)
+        }
+        // TODO: Implement More
     }
 }
