@@ -30,6 +30,8 @@ object Main {
       elem
     }
 
-    ReactDOM.render(App(), container)
+    val component = App()
+    
+    ReactDOM.render(component(), container)
   }
 }
